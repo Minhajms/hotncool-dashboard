@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/auth";
 import { syncSearchConsole } from "@/lib/searchConsole";
 import { syncGa4 } from "@/lib/ga4";
+import { syncMeta } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -23,6 +24,9 @@ export async function GET(request: Request) {
 
   // 2. GA4
   jobs["ga4"] = await syncGa4(30);
+
+  // 3. Meta ads
+  jobs["meta"] = await syncMeta(30);
 
   const anyFailed = Object.values(jobs).some(
     (j) => (j as { ok?: boolean })?.ok === false,

@@ -165,6 +165,61 @@ export async function getGa4Summary(days = 30): Promise<Ga4Summary> {
   return { hasData: rows.length > 0, totalUsers, totalSessions, channels };
 }
 
+export type MetaSummary = {
+  hasData: boolean;
+  totalSpend: number;
+  totalResults: number;
+  from: string | null;
+  to: string | null;
+  dailySpend: { date: string; spend: number }[];
+  campaigns: { campaign_name: string; spend: number; results: number }[];
+};
+
+export async function getMetaSummary(days = 30): Promise<MetaSummary> {
+  const { data } = await supabaseAdmin
+    .from("meta_spend_daily")
+    .select("date,campaign_name,spend_qar,results")
+    .order("date", { ascending: true });
+  const rows = (data ?? []) as {
+    date: string;
+    campaign_name: string;
+    spend_qar: number;
+    results: number;
+  }[];
+
+  const byDay = new Map<string, number>();
+  const byCampaign = new Map<string, { spend: number; results: number }>();
+  let totalSpend = 0;
+  let totalResults = 0;
+  for (const r of rows) {
+    const spend = Number(r.spend_qar ?? 0);
+    const results = r.results ?? 0;
+    totalSpend += spend;
+    totalResults += results;
+    byDay.set(r.date, (byDay.get(r.date) ?? 0) + spend);
+    const c = byCampaign.get(r.campaign_name) ?? { spend: 0, results: 0 };
+    c.spend += spend;
+    c.results += results;
+    byCampaign.set(r.campaign_name, c);
+  }
+  const dailySpend = [...byDay.entries()]
+    .map(([date, spend]) => ({ date, spend }))
+    .slice(-days);
+  const campaigns = [...byCampaign.entries()]
+    .map(([campaign_name, v]) => ({ campaign_name, ...v }))
+    .sort((a, b) => b.spend - a.spend);
+
+  return {
+    hasData: rows.length > 0,
+    totalSpend,
+    totalResults,
+    from: rows[0]?.date ?? null,
+    to: rows[rows.length - 1]?.date ?? null,
+    dailySpend,
+    campaigns,
+  };
+}
+
 export type WeekTotals = {
   installs: number;
   ios: number;
