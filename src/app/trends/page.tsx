@@ -1,14 +1,15 @@
 import { SectionTitle, Card, BarChart, StatCard } from "@/components/ui";
-import { getWeeklyMetrics, getSearchConsoleSummary } from "@/lib/data";
+import { getWeeklyMetrics, getSearchConsoleSummary, getGa4Summary } from "@/lib/data";
 import { num, qar, signedPct, pctChange } from "@/lib/format";
 import { weekLabel } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrendsPage() {
-  const [weeks, seo] = await Promise.all([
+  const [weeks, seo, ga4] = await Promise.all([
     getWeeklyMetrics(),
     getSearchConsoleSummary(30),
+    getGa4Summary(30),
   ]);
 
   const rows = weeks.map((w, i) => {
@@ -70,6 +71,47 @@ export default async function TrendsPage() {
             }))}
             color="var(--cool)"
             height={120}
+            valueFormat={(n) => num(n)}
+          />
+        </Card>
+      )}
+
+      {/* Website Visitors (GA4) */}
+      {ga4.hasData && (
+        <Card className="p-5">
+          <p className="mb-4 text-sm font-semibold">
+            Website Visitors — GA4 · last 30 days{" "}
+            <span className="font-normal text-[var(--muted)]">(auto)</span>
+          </p>
+          <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Users" value={num(ga4.totalUsers)} accent="var(--hot)" />
+            <StatCard
+              label="Sessions"
+              value={num(ga4.totalSessions)}
+              accent="var(--cool)"
+            />
+            <StatCard
+              label="Top channel"
+              value={ga4.channels[0]?.channel ?? "—"}
+              accent="var(--android)"
+              sub={ga4.channels[0] ? `${num(ga4.channels[0].users)} users` : undefined}
+            />
+            <StatCard
+              label="Channels"
+              value={num(ga4.channels.length)}
+              accent="var(--spend)"
+            />
+          </div>
+          <p className="mb-2 text-xs font-medium text-[var(--muted)]">
+            Users by channel
+          </p>
+          <BarChart
+            data={ga4.channels.slice(0, 6).map((c) => ({
+              label: c.channel.split(" ")[0],
+              value: c.users,
+            }))}
+            color="var(--hot)"
+            height={130}
             valueFormat={(n) => num(n)}
           />
         </Card>

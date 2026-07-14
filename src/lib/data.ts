@@ -136,6 +136,35 @@ export async function getSearchConsoleSummary(
   };
 }
 
+export type Ga4Summary = {
+  hasData: boolean;
+  totalUsers: number;
+  totalSessions: number;
+  channels: { channel: string; users: number; sessions: number }[];
+};
+
+export async function getGa4Summary(days = 30): Promise<Ga4Summary> {
+  const { data } = await supabaseAdmin
+    .from("ga4_daily")
+    .select("channel,users,sessions");
+  const rows = (data ?? []) as { channel: string; users: number; sessions: number }[];
+  const byCh = new Map<string, { users: number; sessions: number }>();
+  let totalUsers = 0;
+  let totalSessions = 0;
+  for (const r of rows) {
+    totalUsers += r.users ?? 0;
+    totalSessions += r.sessions ?? 0;
+    const c = byCh.get(r.channel) ?? { users: 0, sessions: 0 };
+    c.users += r.users ?? 0;
+    c.sessions += r.sessions ?? 0;
+    byCh.set(r.channel, c);
+  }
+  const channels = [...byCh.entries()]
+    .map(([channel, v]) => ({ channel, ...v }))
+    .sort((a, b) => b.users - a.users);
+  return { hasData: rows.length > 0, totalUsers, totalSessions, channels };
+}
+
 export type WeekTotals = {
   installs: number;
   ios: number;
