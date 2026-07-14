@@ -11,11 +11,17 @@ const PRESETS = [
   { key: "all", label: "All time" },
 ];
 
+// Pages where a date range has no meaning (static/manual pages).
+const RANGE_FREE_PAGES = ["/arr", "/upload"];
+
 export function DateRangePicker() {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
   const [open, setOpen] = useState(false);
+
+  // Hide the picker where it would do nothing — honesty over decoration.
+  if (RANGE_FREE_PAGES.some((p) => pathname.startsWith(p))) return null;
 
   const currentPreset = sp.get("preset") || (sp.get("from") ? "custom" : "last30");
   const from = sp.get("from") || "";

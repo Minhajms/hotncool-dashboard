@@ -290,6 +290,18 @@ export async function getClarityRange(from: string, to: string) {
   const users = rows.reduce((s, r) => s + Number(r.distinct_users ?? 0), 0);
   const ios = rows.reduce((s, r) => s + Number(r.ios_sessions ?? 0), 0);
   const android = rows.reduce((s, r) => s + Number(r.android_sessions ?? 0), 0);
+  const deadTaps = rows.reduce((s, r) => s + Number(r.dead_taps ?? 0), 0);
+  const rageTaps = rows.reduce((s, r) => s + Number(r.rage_taps ?? 0), 0);
+  // engagement seconds are per-session averages → weight by sessions
+  const activeSecs =
+    sessions > 0
+      ? Math.round(
+          rows.reduce(
+            (s, r) => s + Number(r.engagement_active ?? 0) * Number(r.sessions ?? 0),
+            0,
+          ) / sessions,
+        )
+      : 0;
   return {
     hasData: rows.length > 0,
     days: rows.map((r) => ({ date: String(r.date), sessions: Number(r.sessions ?? 0) })),
@@ -297,6 +309,10 @@ export async function getClarityRange(from: string, to: string) {
     users,
     ios,
     android,
+    deadTaps,
+    rageTaps,
+    activeSecs,
+    daysCount: rows.length,
     latest: rows[rows.length - 1] ?? null,
   };
 }

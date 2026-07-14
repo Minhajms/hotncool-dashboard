@@ -1,15 +1,24 @@
-import { SectionTitle, Card, BarChart } from "@/components/ui";
+import { SectionTitle, Card, BarChart, InfoBanner } from "@/components/ui";
 import { getWeeklyMetrics } from "@/lib/data";
+import { resolveRange, rangeLabel } from "@/lib/range";
 import { num, qar, signedPct, pctChange } from "@/lib/format";
 import { weekLabel } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
-export default async function TrendsPage() {
-  const weeks = await getWeeklyMetrics();
+export default async function TrendsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { from, to } = resolveRange(await searchParams);
+  const allWeeks = await getWeeklyMetrics();
+  // Keep weeks that overlap the selected period (WoW deltas still use the true previous week).
+  const weeks = allWeeks.filter((w) => w.week_start <= to && w.week_end >= from);
 
-  const rows = weeks.map((w, i) => {
-    const prev = i > 0 ? weeks[i - 1] : null;
+  const rows = weeks.map((w) => {
+    const idx = allWeeks.findIndex((x) => x.week_start === w.week_start);
+    const prev = idx > 0 ? allWeeks[idx - 1] : null;
     const installs = w.installs ?? 0;
     const spend = Number(w.spend_qar ?? 0);
     const cpi = installs > 0 ? spend / installs : 0;
@@ -29,8 +38,16 @@ export default async function TrendsPage() {
     <div className="space-y-6">
       <SectionTitle
         title="Trends"
-        subtitle="Week-over-week history (weeks run Thursday → Wednesday). For a custom date range, use Overview."
+        subtitle={`Week-over-week history (weeks run Thursday → Wednesday) · showing weeks that overlap ${rangeLabel(from, to)}`}
       />
+
+      {rows.length === 0 && (
+        <InfoBanner tone="hot">
+          No completed weeks overlap this period. Weekly history currently covers{" "}
+          <b>{allWeeks.length > 0 ? `${weekLabel(allWeeks[0].week_start)} onwards` : "—"}</b> —
+          pick a wider range (e.g. &ldquo;All time&rdquo;).
+        </InfoBanner>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

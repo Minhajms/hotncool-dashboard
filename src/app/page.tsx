@@ -27,7 +27,6 @@ export default async function OverviewPage({
     getAppMeta(),
   ]);
   const days = rangeDays(from, to);
-  const cl = clarity.latest as Record<string, number | string> | null;
 
   const bits: string[] = [];
   if (o.metaHasData) bits.push(`spent ${qar(o.metaSpend)} on Meta ads`);
@@ -110,21 +109,22 @@ export default async function OverviewPage({
       )}
 
       {/* ============ APP BEHAVIOUR (Clarity = the mobile app) ============ */}
-      {clarity.hasData && cl && (
+      {clarity.hasData && (
         <section>
           <h3 className="text-base font-semibold">📲 Inside the app (Microsoft Clarity)</h3>
           <p className="mb-3 text-sm text-[var(--muted)]">
-            How people actually use the Hot N Cool app — sessions, iPhone vs Android, and
-            frustration signals.{" "}
+            How people actually use the Hot N Cool app — totals for the{" "}
+            {clarity.daysCount} day{clarity.daysCount > 1 ? "s" : ""} of saved data in this
+            period (history builds daily since 13 Jul).{" "}
             <Link href="/app-insights" className="font-semibold underline" style={{ color: "var(--cool)" }}>
               Open the detailed App Insights dashboard →
             </Link>
           </p>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard label="App sessions" value={num(clarity.sessions)} accent="var(--cool)" sub={`iPhone ${num(clarity.ios)} · Android ${num(clarity.android)}`} />
-            <StatCard label="Time per session" value={secs(Number(cl.engagement_active ?? 0))} accent="var(--hot)" sub="actively using" />
-            <StatCard label="Dead taps" value={num(Number(cl.dead_taps ?? 0))} accent="var(--spend)" sub="taps that did nothing" />
-            <StatCard label="Rage taps" value={num(Number(cl.rage_taps ?? 0))} accent="var(--bad)" sub="frustration signal" />
+            <StatCard label="Time per session" value={secs(clarity.activeSecs)} accent="var(--hot)" sub="actively using (avg)" />
+            <StatCard label="Dead taps" value={num(clarity.deadTaps)} accent="var(--spend)" sub="taps that did nothing" />
+            <StatCard label="Rage taps" value={num(clarity.rageTaps)} accent="var(--bad)" sub="frustration signal" />
           </div>
         </section>
       )}
