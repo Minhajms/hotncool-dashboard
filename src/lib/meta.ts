@@ -34,6 +34,8 @@ type InsightRow = {
   actions?: { action_type: string; value: string }[];
 };
 
+// Prefer real conversions (purchases/installs/leads); if none are tracked,
+// fall back to link clicks. We surface which one it is in the UI label.
 function deriveResults(row: InsightRow): number {
   const actions = row.actions ?? [];
   let sum = 0;

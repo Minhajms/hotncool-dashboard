@@ -36,16 +36,16 @@ export default async function MetaPage() {
           sub="last 30 days"
         />
         <StatCard
-          label="Results"
+          label="Link clicks"
           value={m.hasData ? num(m.totalResults) : "—"}
           accent="var(--cool)"
-          sub="purchases / installs / leads"
+          sub="clicks on your ads"
         />
         <StatCard
-          label="Cost per result"
+          label="Cost per click"
           value={m.hasData && m.totalResults > 0 ? qar(m.totalSpend / m.totalResults) : "—"}
           accent="var(--hot)"
-          sub="spend ÷ results"
+          sub="spend ÷ clicks"
         />
         <StatCard
           label="Active campaigns"
@@ -81,8 +81,8 @@ export default async function MetaPage() {
               <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
                 <th className="px-5 py-2 font-medium">Campaign</th>
                 <th className="px-5 py-2 font-medium text-right">Spend</th>
-                <th className="px-5 py-2 font-medium text-right">Results</th>
-                <th className="px-5 py-2 font-medium text-right">Cost / result</th>
+                <th className="px-5 py-2 font-medium text-right">Clicks</th>
+                <th className="px-5 py-2 font-medium text-right">Cost / click</th>
               </tr>
             </thead>
             <tbody>
