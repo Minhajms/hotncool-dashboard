@@ -1,12 +1,15 @@
-import { SectionTitle, Card, BarChart } from "@/components/ui";
-import { getWeeklyMetrics } from "@/lib/data";
+import { SectionTitle, Card, BarChart, StatCard } from "@/components/ui";
+import { getWeeklyMetrics, getSearchConsoleSummary } from "@/lib/data";
 import { num, qar, signedPct, pctChange } from "@/lib/format";
 import { weekLabel } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrendsPage() {
-  const weeks = await getWeeklyMetrics();
+  const [weeks, seo] = await Promise.all([
+    getWeeklyMetrics(),
+    getSearchConsoleSummary(30),
+  ]);
 
   const rows = weeks.map((w, i) => {
     const prev = i > 0 ? weeks[i - 1] : null;
@@ -31,6 +34,46 @@ export default async function TrendsPage() {
         title="Trends"
         subtitle="Week-over-week performance (weeks run Thursday → Wednesday)"
       />
+
+      {/* Website Search (Google Search Console) */}
+      {seo.hasData && (
+        <Card className="p-5">
+          <p className="mb-4 text-sm font-semibold">
+            Website Search — Google · last {seo.days.length} days{" "}
+            <span className="font-normal text-[var(--muted)]">(auto)</span>
+          </p>
+          <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Clicks" value={num(seo.totalClicks)} accent="var(--cool)" />
+            <StatCard
+              label="Impressions"
+              value={num(seo.totalImpressions)}
+              accent="var(--hot)"
+            />
+            <StatCard
+              label="Avg CTR"
+              value={`${(seo.avgCtr * 100).toFixed(2)}%`}
+              accent="var(--android)"
+            />
+            <StatCard
+              label="Avg position"
+              value={seo.avgPosition.toFixed(1)}
+              accent="var(--spend)"
+            />
+          </div>
+          <p className="mb-2 text-xs font-medium text-[var(--muted)]">
+            Clicks per day (last 14)
+          </p>
+          <BarChart
+            data={seo.days.slice(-14).map((d) => ({
+              label: d.date.slice(8, 10),
+              value: d.clicks,
+            }))}
+            color="var(--cool)"
+            height={120}
+            valueFormat={(n) => num(n)}
+          />
+        </Card>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -93,6 +93,49 @@ export async function getLastUpdated(): Promise<string | null> {
   return latest;
 }
 
+export type SearchConsoleDay = {
+  date: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+export type SearchConsoleSummary = {
+  hasData: boolean;
+  days: SearchConsoleDay[];
+  totalClicks: number;
+  totalImpressions: number;
+  avgCtr: number;
+  avgPosition: number;
+};
+
+export async function getSearchConsoleSummary(
+  days = 30,
+): Promise<SearchConsoleSummary> {
+  const { data } = await supabaseAdmin
+    .from("search_console_daily")
+    .select("date,clicks,impressions,ctr,position")
+    .order("date", { ascending: true })
+    .limit(days);
+  const rows = (data ?? []) as SearchConsoleDay[];
+  const totalClicks = rows.reduce((s, r) => s + (r.clicks ?? 0), 0);
+  const totalImpressions = rows.reduce((s, r) => s + (r.impressions ?? 0), 0);
+  const avgCtr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+  const avgPosition =
+    rows.length > 0
+      ? rows.reduce((s, r) => s + Number(r.position ?? 0), 0) / rows.length
+      : 0;
+  return {
+    hasData: rows.length > 0,
+    days: rows,
+    totalClicks,
+    totalImpressions,
+    avgCtr,
+    avgPosition,
+  };
+}
+
 export type WeekTotals = {
   installs: number;
   ios: number;
