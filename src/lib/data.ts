@@ -220,6 +220,58 @@ export async function getMetaSummary(days = 30): Promise<MetaSummary> {
   };
 }
 
+export type ClarityLatest = {
+  hasData: boolean;
+  date: string | null;
+  sessions: number;
+  distinctUsers: number;
+  iosSessions: number;
+  androidSessions: number;
+  screensPerSession: number;
+  engagementActive: number;
+  deadTaps: number;
+  rageTaps: number;
+  topCountry: string;
+};
+
+export async function getClarityLatest(): Promise<ClarityLatest> {
+  const { data } = await supabaseAdmin
+    .from("clarity_daily")
+    .select("*")
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const r = data as Record<string, unknown> | null;
+  if (!r) {
+    return {
+      hasData: false,
+      date: null,
+      sessions: 0,
+      distinctUsers: 0,
+      iosSessions: 0,
+      androidSessions: 0,
+      screensPerSession: 0,
+      engagementActive: 0,
+      deadTaps: 0,
+      rageTaps: 0,
+      topCountry: "",
+    };
+  }
+  return {
+    hasData: true,
+    date: String(r.date),
+    sessions: Number(r.sessions ?? 0),
+    distinctUsers: Number(r.distinct_users ?? 0),
+    iosSessions: Number(r.ios_sessions ?? 0),
+    androidSessions: Number(r.android_sessions ?? 0),
+    screensPerSession: Number(r.screens_per_session ?? 0),
+    engagementActive: Number(r.engagement_active ?? 0),
+    deadTaps: Number(r.dead_taps ?? 0),
+    rageTaps: Number(r.rage_taps ?? 0),
+    topCountry: String(r.top_country ?? ""),
+  };
+}
+
 export type WeekTotals = {
   installs: number;
   ios: number;

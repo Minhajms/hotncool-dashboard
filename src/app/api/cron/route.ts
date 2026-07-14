@@ -3,6 +3,7 @@ import { isAuthorized } from "@/lib/auth";
 import { syncSearchConsole } from "@/lib/searchConsole";
 import { syncGa4 } from "@/lib/ga4";
 import { syncMeta } from "@/lib/meta";
+import { syncClarity } from "@/lib/clarity";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -27,6 +28,9 @@ export async function GET(request: Request) {
 
   // 3. Meta ads
   jobs["meta"] = await syncMeta(30);
+
+  // 4. Microsoft Clarity
+  jobs["clarity"] = await syncClarity();
 
   const anyFailed = Object.values(jobs).some(
     (j) => (j as { ok?: boolean })?.ok === false,

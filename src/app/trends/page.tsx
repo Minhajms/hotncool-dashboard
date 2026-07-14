@@ -1,15 +1,16 @@
 import { SectionTitle, Card, BarChart, StatCard } from "@/components/ui";
-import { getWeeklyMetrics, getSearchConsoleSummary, getGa4Summary } from "@/lib/data";
+import { getWeeklyMetrics, getSearchConsoleSummary, getGa4Summary, getClarityLatest } from "@/lib/data";
 import { num, qar, signedPct, pctChange } from "@/lib/format";
 import { weekLabel } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrendsPage() {
-  const [weeks, seo, ga4] = await Promise.all([
+  const [weeks, seo, ga4, clarity] = await Promise.all([
     getWeeklyMetrics(),
     getSearchConsoleSummary(30),
     getGa4Summary(30),
+    getClarityLatest(),
   ]);
 
   const rows = weeks.map((w, i) => {
@@ -114,6 +115,36 @@ export default async function TrendsPage() {
             height={130}
             valueFormat={(n) => num(n)}
           />
+        </Card>
+      )}
+
+      {/* App Behavior (Microsoft Clarity) */}
+      {clarity.hasData && (
+        <Card className="p-5">
+          <p className="mb-4 text-sm font-semibold">
+            App Behavior — Clarity · {clarity.date}{" "}
+            <span className="font-normal text-[var(--muted)]">(auto, daily)</span>
+          </p>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Sessions" value={num(clarity.sessions)} accent="var(--cool)" />
+            <StatCard label="Users" value={num(clarity.distinctUsers)} accent="var(--hot)" />
+            <StatCard
+              label="iOS / Android"
+              value={`${num(clarity.iosSessions)} / ${num(clarity.androidSessions)}`}
+              accent="var(--android)"
+              sub="sessions"
+            />
+            <StatCard
+              label="Screens / session"
+              value={clarity.screensPerSession.toFixed(1)}
+              accent="var(--spend)"
+            />
+          </div>
+          <p className="mt-3 text-xs text-[var(--muted)]">
+            Engagement: {clarity.engagementActive}s active · Frustration signals:{" "}
+            {num(clarity.deadTaps)} dead taps, {num(clarity.rageTaps)} rage taps ·
+            Top country: {clarity.topCountry}. History builds one day at a time.
+          </p>
         </Card>
       )}
 
