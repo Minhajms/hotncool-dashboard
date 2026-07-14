@@ -1,4 +1,4 @@
-import { SectionTitle, Card, InfoBanner, StatCard, BarChart } from "@/components/ui";
+import { SectionTitle, Card, InfoBanner, StatCard, LineChart } from "@/components/ui";
 import { getMetaSummary } from "@/lib/data";
 import { resolveRange, rangeLabel } from "@/lib/range";
 import { num, qar } from "@/lib/format";
@@ -29,7 +29,8 @@ export default async function MetaPage({
         </InfoBanner>
       ) : (
         <InfoBanner>
-          Showing {m.from} → {m.to}. Refreshes automatically every day.
+          Selected period: {rangeLabel(from, to)}. Meta has spend on {m.dailySpend.length}{" "}
+          day{m.dailySpend.length === 1 ? "" : "s"} in this period. Refreshes daily.
         </InfoBanner>
       )}
 
@@ -63,14 +64,13 @@ export default async function MetaPage({
       {/* Daily spend trend */}
       {m.hasData && m.dailySpend.length > 0 && (
         <Card className="p-5">
-          <p className="mb-2 text-sm font-semibold">Daily spend (QAR)</p>
-          <BarChart
-            data={m.dailySpend.slice(-14).map((d) => ({
-              label: d.date.slice(8, 10),
-              value: Math.round(d.spend),
-            }))}
+          <p className="mb-2 text-sm font-semibold">
+            Spend per day (QAR) · {m.dailySpend.length} days with spend
+          </p>
+          <LineChart
+            data={m.dailySpend.map((d) => ({ label: d.date.slice(5), value: Math.round(d.spend) }))}
             color="var(--spend)"
-            height={140}
+            height={200}
             valueFormat={(n) => num(n)}
           />
         </Card>

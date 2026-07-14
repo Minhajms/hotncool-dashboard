@@ -13,6 +13,39 @@ export type SyncResult = {
   error?: string;
 };
 
+export type ScDetailRow = { name: string; clicks: number; impressions: number; ctr: number; position: number };
+export type ScDetail = { queries: ScDetailRow[]; pages: ScDetailRow[] };
+
+/** Live-fetch top search queries and top pages for a date range (not stored). */
+export async function fetchSearchConsoleDetail(from: string, to: string): Promise<ScDetail> {
+  const site = process.env.GSC_SITE_URL;
+  if (!site) return { queries: [], pages: [] };
+  try {
+    const token = await getGoogleAccessToken([SCOPE]);
+    const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`;
+    const call = async (dimension: string): Promise<ScDetailRow[]> => {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: from, endDate: to, dimensions: [dimension], rowLimit: 10 }),
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[] };
+      return (data.rows ?? []).map((r) => ({
+        name: r.keys[0],
+        clicks: Math.round(r.clicks ?? 0),
+        impressions: Math.round(r.impressions ?? 0),
+        ctr: Number((r.ctr ?? 0).toFixed(4)),
+        position: Number((r.position ?? 0).toFixed(1)),
+      }));
+    };
+    const [queries, pages] = await Promise.all([call("query"), call("page")]);
+    return { queries, pages };
+  } catch {
+    return { queries: [], pages: [] };
+  }
+}
+
 /**
  * Pull daily Search Console performance (clicks, impressions, ctr, position)
  * for the last `days` days and upsert into search_console_daily.
