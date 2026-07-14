@@ -1,5 +1,6 @@
 import { SectionTitle, Card, InfoBanner } from "@/components/ui";
 import { DailyForm } from "./DailyForm";
+import { FileUpload } from "./FileUpload";
 import { qatarToday, formatQatar } from "@/lib/dates";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -36,14 +37,8 @@ export default async function UploadPage() {
       </Card>
 
       <Card className="p-5">
-        <p className="mb-1 text-sm font-semibold">
-          Upload an Excel / CSV file
-        </p>
-        <p className="text-sm text-[var(--muted)]">
-          Coming next — a drag-and-drop uploader for spreadsheets (installs,
-          orders, spend, or a full order export for ARR). For now, the daily
-          form above covers manual entry.
-        </p>
+        <p className="mb-3 text-sm font-semibold">Upload an Excel / CSV file</p>
+        <FileUpload />
       </Card>
 
       <Card className="overflow-x-auto">
