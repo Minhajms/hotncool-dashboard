@@ -24,6 +24,8 @@ function n(v: unknown): number {
  * Clarity's export API returns aggregated metrics for the last `numOfDays`
  * (no per-day breakdown, max 3 days, ~10 calls/day). We pull the last full day
  * and store one snapshot row keyed by that date, building history over time.
+ * NOTE: this Clarity project tracks the MOBILE APP (Flutter, iOS+Android),
+ * not the website — confirmed via PopularScreens (FlutterActivity etc.).
  */
 export async function syncClarity(): Promise<ClarityResult> {
   const token = process.env.CLARITY_TOKEN;
@@ -65,12 +67,21 @@ export async function syncClarity(): Promise<ClarityResult> {
       ios_sessions: iosSessions,
       android_sessions: androidSessions,
       top_country: String(country[0]?.name ?? ""),
+      raw: metrics, // full API snapshot (screens, countries, …) for the detail page
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabaseAdmin
+    let { error } = await supabaseAdmin
       .from("clarity_daily")
       .upsert(row, { onConflict: "date" });
+    if (error && /raw/.test(error.message)) {
+      // 'raw' column not created yet — store the numeric snapshot without it.
+      const { raw: _omit, ...withoutRaw } = row;
+      void _omit;
+      ({ error } = await supabaseAdmin
+        .from("clarity_daily")
+        .upsert(withoutRaw, { onConflict: "date" }));
+    }
     if (error) return { ok: false, date, error: error.message };
 
     return { ok: true, date };

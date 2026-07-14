@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { StatCard, SectionTitle, InfoBanner, Card, LineChart } from "@/components/ui";
 import { getOverview, getSearchConsoleSummary, getClarityRange, getAppMeta } from "@/lib/data";
 import { fetchSearchConsoleDetail } from "@/lib/searchConsole";
@@ -108,20 +109,22 @@ export default async function OverviewPage({
         </section>
       )}
 
-      {/* ============ BEHAVIOUR ============ */}
+      {/* ============ APP BEHAVIOUR (Clarity = the mobile app) ============ */}
       {clarity.hasData && cl && (
         <section>
-          <h3 className="text-base font-semibold">🖱️ Website behaviour (Microsoft Clarity)</h3>
+          <h3 className="text-base font-semibold">📲 Inside the app (Microsoft Clarity)</h3>
           <p className="mb-3 text-sm text-[var(--muted)]">
-            How people actually use the website. <b>Dead taps</b> = taps that did nothing (a
-            confusing spot). <b>Rage taps</b> = angry repeated tapping (a frustration signal).
-            iOS/Android here = the visitor&apos;s device, not app installs.
+            How people actually use the Hot N Cool app — sessions, iPhone vs Android, and
+            frustration signals.{" "}
+            <Link href="/app-insights" className="font-semibold underline" style={{ color: "var(--cool)" }}>
+              Open the detailed App Insights dashboard →
+            </Link>
           </p>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Recorded sessions" value={num(clarity.sessions)} accent="var(--cool)" sub={`iOS ${num(clarity.ios)} · Android ${num(clarity.android)} device`} />
-            <StatCard label="Avg engagement" value={secs(Number(cl.engagement_active ?? 0))} accent="var(--hot)" sub="active time / session" />
-            <StatCard label="Dead taps" value={num(Number(cl.dead_taps ?? 0))} accent="var(--spend)" sub="confusing spots" />
-            <StatCard label="Rage taps" value={num(Number(cl.rage_taps ?? 0))} accent="var(--bad)" sub="frustration" />
+            <StatCard label="App sessions" value={num(clarity.sessions)} accent="var(--cool)" sub={`iPhone ${num(clarity.ios)} · Android ${num(clarity.android)}`} />
+            <StatCard label="Time per session" value={secs(Number(cl.engagement_active ?? 0))} accent="var(--hot)" sub="actively using" />
+            <StatCard label="Dead taps" value={num(Number(cl.dead_taps ?? 0))} accent="var(--spend)" sub="taps that did nothing" />
+            <StatCard label="Rage taps" value={num(Number(cl.rage_taps ?? 0))} accent="var(--bad)" sub="frustration signal" />
           </div>
         </section>
       )}
