@@ -111,13 +111,15 @@ export type SearchConsoleSummary = {
 };
 
 export async function getSearchConsoleSummary(
-  days = 30,
+  from: string,
+  to: string,
 ): Promise<SearchConsoleSummary> {
   const { data } = await supabaseAdmin
     .from("search_console_daily")
     .select("date,clicks,impressions,ctr,position")
-    .order("date", { ascending: true })
-    .limit(days);
+    .gte("date", from)
+    .lte("date", to)
+    .order("date", { ascending: true });
   const rows = (data ?? []) as SearchConsoleDay[];
   const totalClicks = rows.reduce((s, r) => s + (r.clicks ?? 0), 0);
   const totalImpressions = rows.reduce((s, r) => s + (r.impressions ?? 0), 0);
@@ -143,10 +145,12 @@ export type Ga4Summary = {
   channels: { channel: string; users: number; sessions: number }[];
 };
 
-export async function getGa4Summary(days = 30): Promise<Ga4Summary> {
+export async function getGa4Summary(from: string, to: string): Promise<Ga4Summary> {
   const { data } = await supabaseAdmin
     .from("ga4_daily")
-    .select("channel,users,sessions");
+    .select("date,channel,users,sessions")
+    .gte("date", from)
+    .lte("date", to);
   const rows = (data ?? []) as { channel: string; users: number; sessions: number }[];
   const byCh = new Map<string, { users: number; sessions: number }>();
   let totalUsers = 0;
@@ -175,10 +179,12 @@ export type MetaSummary = {
   campaigns: { campaign_name: string; spend: number; results: number }[];
 };
 
-export async function getMetaSummary(days = 30): Promise<MetaSummary> {
+export async function getMetaSummary(from: string, to: string): Promise<MetaSummary> {
   const { data } = await supabaseAdmin
     .from("meta_spend_daily")
     .select("date,campaign_name,spend_qar,results")
+    .gte("date", from)
+    .lte("date", to)
     .order("date", { ascending: true });
   const rows = (data ?? []) as {
     date: string;
@@ -204,7 +210,7 @@ export async function getMetaSummary(days = 30): Promise<MetaSummary> {
   }
   const dailySpend = [...byDay.entries()]
     .map(([date, spend]) => ({ date, spend }))
-    .slice(-days);
+    .sort((a, b) => a.date.localeCompare(b.date));
   const campaigns = [...byCampaign.entries()]
     .map(([campaign_name, v]) => ({ campaign_name, ...v }))
     .sort((a, b) => b.spend - a.spend);
@@ -269,6 +275,120 @@ export async function getClarityLatest(): Promise<ClarityLatest> {
     deadTaps: Number(r.dead_taps ?? 0),
     rageTaps: Number(r.rage_taps ?? 0),
     topCountry: String(r.top_country ?? ""),
+  };
+}
+
+export async function getClarityRange(from: string, to: string) {
+  const { data } = await supabaseAdmin
+    .from("clarity_daily")
+    .select("*")
+    .gte("date", from)
+    .lte("date", to)
+    .order("date", { ascending: true });
+  const rows = (data ?? []) as Record<string, number | string>[];
+  const sessions = rows.reduce((s, r) => s + Number(r.sessions ?? 0), 0);
+  const users = rows.reduce((s, r) => s + Number(r.distinct_users ?? 0), 0);
+  const ios = rows.reduce((s, r) => s + Number(r.ios_sessions ?? 0), 0);
+  const android = rows.reduce((s, r) => s + Number(r.android_sessions ?? 0), 0);
+  return {
+    hasData: rows.length > 0,
+    days: rows.map((r) => ({ date: String(r.date), sessions: Number(r.sessions ?? 0) })),
+    sessions,
+    users,
+    ios,
+    android,
+    latest: rows[rows.length - 1] ?? null,
+  };
+}
+
+export type OverviewMetrics = {
+  from: string;
+  to: string;
+  // app
+  installs: number;
+  iosInstalls: number;
+  androidInstalls: number;
+  orders: number;
+  hasAppData: boolean;
+  // ads
+  metaSpend: number;
+  metaHasData: boolean;
+  costPerInstall: number | null;
+  // web
+  ga4Users: number;
+  ga4Sessions: number;
+  ga4HasData: boolean;
+  scClicks: number;
+  scImpressions: number;
+  scHasData: boolean;
+  // behaviour
+  claritySessions: number;
+  clarityHasData: boolean;
+  // per-day series for charts
+  series: { date: string; spend: number; users: number; clicks: number; installs: number; orders: number }[];
+};
+
+/** Everything for the Overview page, for a chosen date range. */
+export async function getOverview(from: string, to: string): Promise<OverviewMetrics> {
+  const [daily, meta, ga4, sc, clarity] = await Promise.all([
+    getDailyRange(from, to),
+    getMetaSummary(from, to),
+    getGa4Summary(from, to),
+    getSearchConsoleSummary(from, to),
+    getClarityRange(from, to),
+  ]);
+
+  const iosInstalls = daily.reduce((s, r) => s + (r.ios_installs ?? 0), 0);
+  const androidInstalls = daily.reduce((s, r) => s + (r.android_installs ?? 0), 0);
+  const orders = daily.reduce((s, r) => s + (r.orders ?? 0), 0);
+  const installs = iosInstalls + androidInstalls;
+
+  // Build per-day series merged across sources.
+  const map = new Map<string, { spend: number; users: number; clicks: number; installs: number; orders: number }>();
+  const bump = (d: string) => map.get(d) ?? { spend: 0, users: 0, clicks: 0, installs: 0, orders: 0 };
+  for (const r of meta.dailySpend) { const o = bump(r.date); o.spend += r.spend; map.set(r.date, o); }
+  for (const r of sc.days) { const o = bump(r.date); o.clicks += r.clicks; map.set(r.date, o); }
+  for (const r of clarity.days) { const o = bump(r.date); map.set(r.date, o); }
+  for (const r of daily) {
+    const o = bump(r.metric_date);
+    o.installs += (r.ios_installs ?? 0) + (r.android_installs ?? 0);
+    o.orders += r.orders ?? 0;
+    map.set(r.metric_date, o);
+  }
+  // GA4 users per day
+  const { data: ga4Rows } = await supabaseAdmin
+    .from("ga4_daily")
+    .select("date,users")
+    .gte("date", from)
+    .lte("date", to);
+  for (const r of (ga4Rows ?? []) as { date: string; users: number }[]) {
+    const o = bump(r.date); o.users += r.users ?? 0; map.set(r.date, o);
+  }
+
+  const series = [...map.entries()]
+    .map(([date, v]) => ({ date, ...v }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    from,
+    to,
+    installs,
+    iosInstalls,
+    androidInstalls,
+    orders,
+    hasAppData: daily.length > 0,
+    metaSpend: meta.totalSpend,
+    metaHasData: meta.hasData,
+    costPerInstall: installs > 0 ? meta.totalSpend / installs : null,
+    ga4Users: ga4.totalUsers,
+    ga4Sessions: ga4.totalSessions,
+    ga4HasData: ga4.hasData,
+    scClicks: sc.totalClicks,
+    scImpressions: sc.totalImpressions,
+    scHasData: sc.hasData,
+    claritySessions: clarity.sessions,
+    clarityHasData: clarity.hasData,
+    series,
   };
 }
 

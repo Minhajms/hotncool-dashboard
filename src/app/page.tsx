@@ -1,116 +1,127 @@
-import { StatCard, SectionTitle, InfoBanner, Card } from "@/components/ui";
-import { getDay, getAppMeta } from "@/lib/data";
-import { qatarToday, addDays, formatQatar } from "@/lib/dates";
-import { num, qar, pctChange } from "@/lib/format";
+import { StatCard, SectionTitle, InfoBanner, Card, LineChart } from "@/components/ui";
+import { getOverview, getAppMeta } from "@/lib/data";
+import { resolveRange, rangeLabel, rangeDays } from "@/lib/range";
+import { num, qar } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function TodayPage() {
-  const today = qatarToday();
-  const lastWeekSameDay = addDays(today, -7);
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const { from, to } = resolveRange(sp);
+  const [o, meta] = await Promise.all([getOverview(from, to), getAppMeta()]);
+  const days = rangeDays(from, to);
 
-  const [todayRow, lastWeekRow, meta] = await Promise.all([
-    getDay(today),
-    getDay(lastWeekSameDay),
-    getAppMeta(),
-  ]);
-
-  const t = {
-    ios: todayRow?.ios_installs ?? 0,
-    android: todayRow?.android_installs ?? 0,
-    orders: todayRow?.orders ?? 0,
-    spend: Number(todayRow?.spend_qar ?? 0),
-  };
-  const installs = t.ios + t.android;
-  const lw = lastWeekRow
-    ? {
-        installs:
-          (lastWeekRow.ios_installs ?? 0) + (lastWeekRow.android_installs ?? 0),
-        orders: lastWeekRow.orders ?? 0,
-        spend: Number(lastWeekRow.spend_qar ?? 0),
-      }
-    : null;
-
-  const hasData = !!todayRow;
+  // Plain-English summary of what happened.
+  const bits: string[] = [];
+  if (o.metaHasData) bits.push(`spent ${qar(o.metaSpend)} on Meta ads`);
+  if (o.ga4HasData) bits.push(`drew ${num(o.ga4Users)} website visitors`);
+  if (o.scHasData) bits.push(`got ${num(o.scClicks)} clicks from Google Search`);
+  if (o.clarityHasData) bits.push(`saw ${num(o.claritySessions)} app sessions`);
+  const summary =
+    bits.length > 0
+      ? `In this period you ${bits.slice(0, -1).join(", ")}${bits.length > 1 ? " and " : ""}${bits[bits.length - 1]}.`
+      : "No data yet for this period.";
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Today"
-        subtitle={`${formatQatar(new Date()).split(",")[0]} · vs same day last week`}
-      />
+      <SectionTitle title="Overview" subtitle={`${rangeLabel(from, to)} · ${days} day${days > 1 ? "s" : ""}`} />
 
-      {!hasData && (
+      <Card className="p-5">
+        <p className="text-sm leading-relaxed">{summary}</p>
+      </Card>
+
+      {/* Headline results */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          App results
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Installs"
+            value={o.hasAppData ? num(o.installs) : "—"}
+            accent="var(--hot)"
+            sub={o.hasAppData ? `iOS ${num(o.iosInstalls)} · Android ${num(o.androidInstalls)}` : "waiting for App Store / Play"}
+          />
+          <StatCard
+            label="Orders"
+            value={o.hasAppData ? num(o.orders) : "—"}
+            accent="var(--cool)"
+            sub={o.hasAppData ? undefined : "waiting for Orders API"}
+          />
+          <StatCard label="Ad spend" value={o.metaHasData ? qar(o.metaSpend) : "—"} accent="var(--spend)" sub="Meta" />
+          <StatCard
+            label="Cost / install"
+            value={o.costPerInstall !== null ? qar(o.costPerInstall) : "—"}
+            accent="var(--spend)"
+            sub="spend ÷ installs"
+          />
+        </div>
+      </div>
+
+      {/* Audience */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Audience & reach
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Website visitors" value={o.ga4HasData ? num(o.ga4Users) : "—"} accent="var(--hot)" sub="GA4" />
+          <StatCard label="Website sessions" value={o.ga4HasData ? num(o.ga4Sessions) : "—"} accent="var(--cool)" sub="GA4" />
+          <StatCard label="Search clicks" value={o.scHasData ? num(o.scClicks) : "—"} accent="var(--android)" sub="Google Search" />
+          <StatCard label="App sessions" value={o.clarityHasData ? num(o.claritySessions) : "—"} accent="var(--spend)" sub="Clarity" />
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {o.metaHasData && (
+          <Card className="p-5">
+            <p className="mb-1 text-sm font-semibold">Ad spend per day (QAR)</p>
+            <LineChart
+              data={o.series.map((d) => ({ label: d.date.slice(5), value: Math.round(d.spend) }))}
+              color="var(--spend)"
+              valueFormat={(n) => num(n)}
+            />
+          </Card>
+        )}
+        {o.ga4HasData && (
+          <Card className="p-5">
+            <p className="mb-1 text-sm font-semibold">Website visitors per day</p>
+            <LineChart
+              data={o.series.map((d) => ({ label: d.date.slice(5), value: d.users }))}
+              color="var(--hot)"
+              valueFormat={(n) => num(n)}
+            />
+          </Card>
+        )}
+        {o.scHasData && (
+          <Card className="p-5">
+            <p className="mb-1 text-sm font-semibold">Search clicks per day</p>
+            <LineChart
+              data={o.series.map((d) => ({ label: d.date.slice(5), value: d.clicks }))}
+              color="var(--cool)"
+              valueFormat={(n) => num(n)}
+            />
+          </Card>
+        )}
+      </div>
+
+      {(!o.hasAppData) && (
         <InfoBanner>
-          No live figures for today yet. Daily numbers fill in automatically
-          once the API integrations (Search Console, GA4, Play, App Store, Meta)
-          are connected. Until then, use the <b>Upload</b> page to enter figures
-          manually.
+          <b>Installs & orders</b> will appear here automatically once App Store,
+          Play Console and the Orders API are connected. Everything else above is
+          live. You can also enter figures manually on the <b>Upload</b> page.
         </InfoBanner>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Installs (total)"
-          value={num(installs)}
-          accent="var(--hot)"
-          delta={lw ? pctChange(installs, lw.installs) : null}
-          sub={lw ? `last wk: ${num(lw.installs)}` : "no comparison yet"}
-        />
-        <StatCard
-          label="iOS installs"
-          value={num(t.ios)}
-          accent="var(--ios)"
-          sub="App Store"
-        />
-        <StatCard
-          label="Android installs"
-          value={num(t.android)}
-          accent="var(--android)"
-          sub="Google Play"
-        />
-        <StatCard
-          label="Orders"
-          value={num(t.orders)}
-          accent="var(--cool)"
-          delta={lw ? pctChange(t.orders, lw.orders) : null}
-          sub={lw ? `last wk: ${num(lw.orders)}` : "no comparison yet"}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Ad spend"
-          value={qar(t.spend)}
-          accent="var(--spend)"
-          delta={lw ? pctChange(t.spend, lw.spend) : null}
-          sub={lw ? `last wk: ${qar(lw.spend)}` : "no comparison yet"}
-        />
-        <StatCard
-          label="Cost / install"
-          value={installs > 0 ? qar(t.spend / installs) : "—"}
-          accent="var(--spend)"
-          sub="spend ÷ installs"
-        />
-        <StatCard
-          label="Lifetime iOS downloads"
-          value={num(meta.lifetime_ios_downloads)}
-          accent="var(--ios)"
-          sub="all-time"
-        />
-        <StatCard
-          label="Android active base"
-          value={num(meta.android_active_base)}
-          accent="var(--android)"
-          sub="active devices"
-        />
-      </div>
-
       <Card className="p-5">
         <p className="text-sm text-[var(--muted)]">
-          This page compares <b>today</b> against the <b>same weekday last
-          week</b>. Growth arrows turn green when today is ahead. All figures are
-          in Qatar time (UTC+3).
+          Lifetime iOS downloads: <b>{num(meta.lifetime_ios_downloads)}</b> ·
+          Android active base: <b>{num(meta.android_active_base)}</b>. Use the date
+          picker (top right) to change the period — every number and chart updates.
         </p>
       </Card>
     </div>

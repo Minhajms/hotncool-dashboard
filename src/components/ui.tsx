@@ -95,6 +95,79 @@ export function InfoBanner({
   );
 }
 
+/** Pure-SVG line chart with area fill (server-rendered). */
+export function LineChart({
+  data,
+  color = "var(--cool)",
+  height = 180,
+  valueFormat = (n: number) => String(n),
+}: {
+  data: { label: string; value: number }[];
+  color?: string;
+  height?: number;
+  valueFormat?: (n: number) => string;
+}) {
+  const w = 720;
+  const padX = 8;
+  const padTop = 24;
+  const padBottom = 22;
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const n = data.length;
+  const stepX = n > 1 ? (w - padX * 2) / (n - 1) : 0;
+  const yFor = (v: number) => padTop + (1 - v / max) * (height - padTop - padBottom);
+  const xFor = (i: number) => padX + i * stepX;
+  const pts = data.map((d, i) => `${xFor(i)},${yFor(d.value)}`);
+  const line = pts.length ? `M ${pts.join(" L ")}` : "";
+  const area =
+    pts.length > 1
+      ? `M ${xFor(0)},${height - padBottom} L ${pts.join(" L ")} L ${xFor(n - 1)},${height - padBottom} Z`
+      : "";
+  // show a subset of x labels to avoid crowding
+  const labelEvery = Math.max(1, Math.ceil(n / 8));
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} role="img">
+      {area && <path d={area} style={{ fill: color, opacity: 0.12 }} />}
+      {line && <path d={line} style={{ stroke: color, fill: "none", strokeWidth: 2.5 }} />}
+      {data.map((d, i) =>
+        n <= 40 ? (
+          <circle key={i} cx={xFor(i)} cy={yFor(d.value)} r={2.5} style={{ fill: color }} />
+        ) : null,
+      )}
+      {/* peak label */}
+      {data.length > 0 &&
+        (() => {
+          const peakI = data.reduce((bi, d, i) => (d.value > data[bi].value ? i : bi), 0);
+          return (
+            <text
+              x={Math.min(Math.max(xFor(peakI), 20), w - 20)}
+              y={yFor(data[peakI].value) - 8}
+              textAnchor="middle"
+              fontSize="11"
+              fontWeight="600"
+              style={{ fill: "var(--foreground)" }}
+            >
+              {valueFormat(data[peakI].value)}
+            </text>
+          );
+        })()}
+      {data.map((d, i) =>
+        i % labelEvery === 0 ? (
+          <text
+            key={i}
+            x={xFor(i)}
+            y={height - 6}
+            textAnchor="middle"
+            fontSize="10"
+            style={{ fill: "var(--muted)" }}
+          >
+            {d.label}
+          </text>
+        ) : null,
+      )}
+    </svg>
+  );
+}
+
 /** Pure-SVG vertical bar chart (server-rendered, no client JS). */
 export function BarChart({
   data,

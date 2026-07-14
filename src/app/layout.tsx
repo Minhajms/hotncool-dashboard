@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Suspense } from "react";
 import { Nav } from "@/components/Nav";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { getLastUpdated } from "@/lib/data";
 import { formatQatar } from "@/lib/dates";
 
@@ -61,7 +63,12 @@ export default function RootLayout({
                 </p>
               </div>
             </div>
-            <Nav />
+            <div className="flex items-center gap-3">
+              <Nav />
+              <Suspense fallback={null}>
+                <DateRangePicker />
+              </Suspense>
+            </div>
           </div>
         </header>
 

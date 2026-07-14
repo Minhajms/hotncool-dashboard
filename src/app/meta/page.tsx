@@ -1,11 +1,17 @@
 import { SectionTitle, Card, InfoBanner, StatCard, BarChart } from "@/components/ui";
 import { getMetaSummary } from "@/lib/data";
+import { resolveRange, rangeLabel } from "@/lib/range";
 import { num, qar } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function MetaPage() {
-  const m = await getMetaSummary(30);
+export default async function MetaPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { from, to } = resolveRange(await searchParams);
+  const m = await getMetaSummary(from, to);
 
   return (
     <div className="space-y-6">
@@ -33,7 +39,7 @@ export default async function MetaPage() {
           label="Total spend"
           value={m.hasData ? qar(m.totalSpend) : "—"}
           accent="var(--spend)"
-          sub="last 30 days"
+          sub={rangeLabel(from, to)}
         />
         <StatCard
           label="Link clicks"
