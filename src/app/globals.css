@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e5e8ec;
+  --hot: #ef5138;      /* warm accent */
+  --hot-soft: #fdece8;
+  --cool: #0ea5b7;     /* cool accent */
+  --cool-soft: #e2f6f8;
+  --ios: #0f172a;
+  --android: #16a34a;
+  --spend: #7c3aed;
+  --good: #16a34a;
+  --bad: #dc2626;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-hot: var(--hot);
+  --color-cool: var(--cool);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b0f17;
+    --surface: #131a24;
+    --surface-2: #0f1620;
+    --foreground: #e8edf3;
+    --muted: #94a3b8;
+    --border: #232c39;
+    --hot: #ff6a4d;
+    --hot-soft: #2a1712;
+    --cool: #22c3d6;
+    --cool-soft: #0e2a2e;
+    --ios: #e8edf3;
+    --android: #4ade80;
+    --spend: #a78bfa;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }

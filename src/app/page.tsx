@@ -1,65 +1,118 @@
-import Image from "next/image";
+import { StatCard, SectionTitle, InfoBanner, Card } from "@/components/ui";
+import { getDay, getAppMeta } from "@/lib/data";
+import { qatarToday, addDays, formatQatar } from "@/lib/dates";
+import { num, qar, pctChange } from "@/lib/format";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function TodayPage() {
+  const today = qatarToday();
+  const lastWeekSameDay = addDays(today, -7);
+
+  const [todayRow, lastWeekRow, meta] = await Promise.all([
+    getDay(today),
+    getDay(lastWeekSameDay),
+    getAppMeta(),
+  ]);
+
+  const t = {
+    ios: todayRow?.ios_installs ?? 0,
+    android: todayRow?.android_installs ?? 0,
+    orders: todayRow?.orders ?? 0,
+    spend: Number(todayRow?.spend_qar ?? 0),
+  };
+  const installs = t.ios + t.android;
+  const lw = lastWeekRow
+    ? {
+        installs:
+          (lastWeekRow.ios_installs ?? 0) + (lastWeekRow.android_installs ?? 0),
+        orders: lastWeekRow.orders ?? 0,
+        spend: Number(lastWeekRow.spend_qar ?? 0),
+      }
+    : null;
+
+  const hasData = !!todayRow;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-6">
+      <SectionTitle
+        title="Today"
+        subtitle={`${formatQatar(new Date()).split(",")[0]} · vs same day last week`}
+      />
+
+      {!hasData && (
+        <InfoBanner>
+          No live figures for today yet. Daily numbers fill in automatically
+          once the API integrations (Search Console, GA4, Play, App Store, Meta)
+          are connected. Until then, use the <b>Upload</b> page to enter figures
+          manually.
+        </InfoBanner>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Installs (total)"
+          value={num(installs)}
+          accent="var(--hot)"
+          delta={lw ? pctChange(installs, lw.installs) : null}
+          sub={lw ? `last wk: ${num(lw.installs)}` : "no comparison yet"}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <StatCard
+          label="iOS installs"
+          value={num(t.ios)}
+          accent="var(--ios)"
+          sub="App Store"
+        />
+        <StatCard
+          label="Android installs"
+          value={num(t.android)}
+          accent="var(--android)"
+          sub="Google Play"
+        />
+        <StatCard
+          label="Orders"
+          value={num(t.orders)}
+          accent="var(--cool)"
+          delta={lw ? pctChange(t.orders, lw.orders) : null}
+          sub={lw ? `last wk: ${num(lw.orders)}` : "no comparison yet"}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Ad spend"
+          value={qar(t.spend)}
+          accent="var(--spend)"
+          delta={lw ? pctChange(t.spend, lw.spend) : null}
+          sub={lw ? `last wk: ${qar(lw.spend)}` : "no comparison yet"}
+        />
+        <StatCard
+          label="Cost / install"
+          value={installs > 0 ? qar(t.spend / installs) : "—"}
+          accent="var(--spend)"
+          sub="spend ÷ installs"
+        />
+        <StatCard
+          label="Lifetime iOS downloads"
+          value={num(meta.lifetime_ios_downloads)}
+          accent="var(--ios)"
+          sub="all-time"
+        />
+        <StatCard
+          label="Android active base"
+          value={num(meta.android_active_base)}
+          accent="var(--android)"
+          sub="active devices"
+        />
+      </div>
+
+      <Card className="p-5">
+        <p className="text-sm text-[var(--muted)]">
+          This page compares <b>today</b> against the <b>same weekday last
+          week</b>. Growth arrows turn green when today is ahead. All figures are
+          in Qatar time (UTC+3).
+        </p>
+      </Card>
     </div>
   );
 }
