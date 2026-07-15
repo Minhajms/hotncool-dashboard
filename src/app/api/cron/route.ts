@@ -4,6 +4,7 @@ import { syncSearchConsole } from "@/lib/searchConsole";
 import { syncGa4 } from "@/lib/ga4";
 import { syncMeta } from "@/lib/meta";
 import { syncClarity } from "@/lib/clarity";
+import { syncAppStore } from "@/lib/appstore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -31,6 +32,11 @@ export async function GET(request: Request) {
 
   // 4. Microsoft Clarity
   jobs["clarity"] = await syncClarity();
+
+  // 5. App Store (iOS installs) — only runs when configured
+  if (process.env.APPSTORE_ISSUER_ID && process.env.APPSTORE_VENDOR_NUMBER) {
+    jobs["appstore"] = await syncAppStore(14);
+  }
 
   const anyFailed = Object.values(jobs).some(
     (j) => (j as { ok?: boolean })?.ok === false,
