@@ -1,28 +1,25 @@
 import { SignJWT, importPKCS8 } from "jose";
 import { gunzipSync } from "node:zlib";
 import { supabaseAdmin } from "./supabase";
-import { qatarToday, addDays } from "./dates";
 
 export type AppStoreResult = {
   ok: boolean;
   daysWritten: number;
   totalInstalls: number;
-  from: string;
-  to: string;
+  provisioning?: boolean;
   error?: string;
   note?: string;
 };
 
-// Product Type Identifiers that represent a download/install (not updates "7*", not in-app).
-const DOWNLOAD_TYPES = /^(1|1F|1T|1E|1EP|1EU|F1|FI)$/;
+const API = "https://api.appstoreconnect.apple.com";
+const REPORT_NAME = "App Downloads Standard";
 
 async function appStoreToken(): Promise<string> {
   const p8b64 = process.env.APPSTORE_P8_B64;
   const keyId = process.env.APPSTORE_KEY_ID;
   const issuer = process.env.APPSTORE_ISSUER_ID;
   if (!p8b64 || !keyId || !issuer) throw new Error("Missing APPSTORE_P8_B64 / APPSTORE_KEY_ID / APPSTORE_ISSUER_ID");
-  const pem = Buffer.from(p8b64, "base64").toString("utf8");
-  const key = await importPKCS8(pem, "ES256");
+  const key = await importPKCS8(Buffer.from(p8b64, "base64").toString("utf8"), "ES256");
   return new SignJWT({})
     .setProtectedHeader({ alg: "ES256", kid: keyId, typ: "JWT" })
     .setIssuer(issuer)
@@ -32,72 +29,96 @@ async function appStoreToken(): Promise<string> {
     .sign(key);
 }
 
-/** Fetch & parse one day's SALES SUMMARY report → iOS downloads for our app. */
-async function installsForDate(token: string, vendor: string, appId: string, date: string): Promise<number | null> {
-  const params = new URLSearchParams({
-    "filter[frequency]": "DAILY",
-    "filter[reportType]": "SALES",
-    "filter[reportSubType]": "SUMMARY",
-    "filter[vendorNumber]": vendor,
-    "filter[reportDate]": date,
-  });
-  const res = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/a-gzip" },
-  });
-  if (res.status === 404) return null; // no report for that day yet
-  if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 200)}`);
+type ApiList = { data?: { id: string; attributes?: Record<string, unknown> }[] };
 
-  const buf = Buffer.from(await res.arrayBuffer());
-  const tsv = gunzipSync(buf).toString("utf8");
-  const lines = tsv.split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return 0;
-  const header = lines[0].split("\t");
-  const iType = header.indexOf("Product Type Identifier");
-  const iUnits = header.indexOf("Units");
-  const iAppId = header.indexOf("Apple Identifier");
-  let installs = 0;
-  for (const line of lines.slice(1)) {
-    const c = line.split("\t");
-    if (iAppId >= 0 && appId && c[iAppId] !== appId) continue;
-    const ptype = (c[iType] ?? "").trim();
-    if (!DOWNLOAD_TYPES.test(ptype)) continue;
-    installs += Number(c[iUnits] ?? 0) || 0;
+/** Case-insensitive header index lookup with fallbacks. */
+function col(header: string[], ...names: string[]): number {
+  const lower = header.map((h) => h.trim().toLowerCase());
+  for (const n of names) {
+    const i = lower.indexOf(n.toLowerCase());
+    if (i >= 0) return i;
   }
-  return installs;
+  return -1;
 }
 
-/** Pull the last `days` days of iOS installs and upsert into daily_metrics.ios_installs. */
-export async function syncAppStore(days = 14): Promise<AppStoreResult> {
-  const vendor = process.env.APPSTORE_VENDOR_NUMBER;
-  const appId = process.env.APPLE_APP_ID ?? "";
-  const to = addDays(qatarToday(), -1); // yesterday is the newest available report
-  const from = addDays(to, -(days - 1));
-  if (!vendor) return { ok: false, daysWritten: 0, totalInstalls: 0, from, to, error: "APPSTORE_VENDOR_NUMBER is not set" };
+/**
+ * iOS installs via App Store Connect Analytics Reports ("App Downloads Standard").
+ * Apple generates daily report instances ~24-48h after the ONGOING request is created;
+ * until then instances=0 and we report `provisioning: true` (not an error).
+ * Counts "first-time downloads" per date and upserts daily_metrics.ios_installs.
+ */
+export async function syncAppStore(maxDays = 30): Promise<AppStoreResult> {
+  const reqId = process.env.APPSTORE_REPORT_REQUEST_ID;
+  if (!reqId) return { ok: false, daysWritten: 0, totalInstalls: 0, error: "APPSTORE_REPORT_REQUEST_ID is not set" };
 
   try {
     const token = await appStoreToken();
+    const H = { Authorization: `Bearer ${token}` };
+
+    // 1. Find the "App Downloads Standard" report.
+    const repRes = await fetch(`${API}/v1/analyticsReportRequests/${reqId}/reports?limit=200`, { headers: H });
+    if (!repRes.ok) return { ok: false, daysWritten: 0, totalInstalls: 0, error: `reports ${repRes.status}: ${(await repRes.text()).slice(0, 160)}` };
+    const reports = (await repRes.json()) as ApiList;
+    const report = (reports.data ?? []).find((r) => r.attributes?.name === REPORT_NAME);
+    if (!report) return { ok: false, daysWritten: 0, totalInstalls: 0, error: `"${REPORT_NAME}" report not found` };
+
+    // 2. Daily instances (Apple fills these over time).
+    const instRes = await fetch(`${API}/v1/analyticsReports/${report.id}/instances?filter[granularity]=DAILY&limit=${maxDays}`, { headers: H });
+    const instances = (await instRes.json()) as ApiList;
+    const list = (instances.data ?? []).sort((a, b) =>
+      String(b.attributes?.processingDate ?? "").localeCompare(String(a.attributes?.processingDate ?? "")),
+    );
+    if (list.length === 0) {
+      return { ok: true, daysWritten: 0, totalInstalls: 0, provisioning: true, note: "Apple is still generating the first daily reports (usually within 24-48h)." };
+    }
+
+    // 3. Download each recent instance's segment(s) and tally first-time downloads by date.
+    const byDate = new Map<string, number>();
+    for (const inst of list.slice(0, maxDays)) {
+      const segRes = await fetch(`${API}/v1/analyticsReportInstances/${inst.id}/segments`, { headers: H });
+      const segs = (await segRes.json()) as { data?: { attributes?: { url?: string } }[] };
+      for (const s of segs.data ?? []) {
+        const url = s.attributes?.url;
+        if (!url) continue;
+        const dl = await fetch(url);
+        const buf = Buffer.from(await dl.arrayBuffer());
+        let text: string;
+        try { text = gunzipSync(buf).toString("utf8"); } catch { text = buf.toString("utf8"); }
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length < 2) continue;
+        const header = lines[0].split("\t");
+        const iDate = col(header, "Date");
+        const iCount = col(header, "Counts", "Downloads", "Count");
+        const iType = col(header, "Download Type");
+        if (iDate < 0 || iCount < 0) continue;
+        for (const line of lines.slice(1)) {
+          const c = line.split("\t");
+          const type = iType >= 0 ? (c[iType] ?? "").toLowerCase() : "first-time download";
+          // installs = first-time downloads only (exclude redownloads/updates)
+          if (iType >= 0 && !type.includes("first")) continue;
+          const date = (c[iDate] ?? "").trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+          byDate.set(date, (byDate.get(date) ?? 0) + (Number(c[iCount] ?? 0) || 0));
+        }
+      }
+    }
+
+    if (byDate.size === 0) {
+      return { ok: true, daysWritten: 0, totalInstalls: 0, provisioning: true, note: "Report instances exist but no download rows parsed yet." };
+    }
+
     let daysWritten = 0;
     let totalInstalls = 0;
-    let missing = 0;
-    for (let d = from; d <= to; d = addDays(d, 1)) {
-      const installs = await installsForDate(token, vendor, appId, d);
-      if (installs === null) { missing++; continue; }
+    for (const [date, installs] of byDate) {
       const { error } = await supabaseAdmin
         .from("daily_metrics")
-        .upsert({ metric_date: d, ios_installs: installs, source: "appstore", updated_at: new Date().toISOString() }, { onConflict: "metric_date" });
-      if (error) return { ok: false, daysWritten, totalInstalls, from, to, error: error.message };
+        .upsert({ metric_date: date, ios_installs: installs, source: "appstore", updated_at: new Date().toISOString() }, { onConflict: "metric_date" });
+      if (error) return { ok: false, daysWritten, totalInstalls, error: error.message };
       daysWritten++;
       totalInstalls += installs;
     }
-    return {
-      ok: true,
-      daysWritten,
-      totalInstalls,
-      from,
-      to,
-      note: missing > 0 ? `${missing} day(s) had no report yet (normal for very recent days)` : undefined,
-    };
+    return { ok: true, daysWritten, totalInstalls };
   } catch (e) {
-    return { ok: false, daysWritten: 0, totalInstalls: 0, from, to, error: (e as Error).message };
+    return { ok: false, daysWritten: 0, totalInstalls: 0, error: (e as Error).message };
   }
 }

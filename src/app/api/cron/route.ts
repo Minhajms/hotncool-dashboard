@@ -5,6 +5,7 @@ import { syncGa4 } from "@/lib/ga4";
 import { syncMeta } from "@/lib/meta";
 import { syncClarity } from "@/lib/clarity";
 import { syncAppStore } from "@/lib/appstore";
+import { syncPlay } from "@/lib/play";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -34,8 +35,13 @@ export async function GET(request: Request) {
   jobs["clarity"] = await syncClarity();
 
   // 5. App Store (iOS installs) — only runs when configured
-  if (process.env.APPSTORE_ISSUER_ID && process.env.APPSTORE_VENDOR_NUMBER) {
-    jobs["appstore"] = await syncAppStore(14);
+  if (process.env.APPSTORE_ISSUER_ID && process.env.APPSTORE_REPORT_REQUEST_ID) {
+    jobs["appstore"] = await syncAppStore(30);
+  }
+
+  // 6. Google Play (Android installs) — only runs when a bucket is configured
+  if (process.env.PLAY_BUCKET) {
+    jobs["play"] = await syncPlay();
   }
 
   const anyFailed = Object.values(jobs).some(
