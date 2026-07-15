@@ -135,7 +135,12 @@ export default async function AppInsightsPage({
         </h3>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Sessions" value={num(sessions)} accent="var(--cool)" sub="times the app was opened & used" />
-          <StatCard label="People" value={num(users)} accent="var(--hot)" sub={daysCount > 1 ? "sum of daily users" : "distinct users"} />
+          <StatCard
+            label="People"
+            value={daysCount > 1 ? num(Math.round(users / daysCount)) : num(users)}
+            accent="var(--hot)"
+            sub={daysCount > 1 ? "avg distinct users per day" : "distinct users"}
+          />
           <StatCard label="iPhone sessions" value={num(ios)} accent="var(--ios)" sub={`${sessions > 0 ? Math.round((ios / sessions) * 100) : 0}% of total`} />
           <StatCard label="Android sessions" value={num(android)} accent="var(--android)" sub={`${sessions > 0 ? Math.round((android / sessions) * 100) : 0}% of total`} />
         </div>
@@ -165,8 +170,8 @@ export default async function AppInsightsPage({
           </p>
           <Card className="p-5">
             <BarChart
-              data={screens.slice(0, 8).map((s) => ({
-                label: s.name.replace(/ page$/i, "").slice(0, 14),
+              data={screens.slice(0, 6).map((s) => ({
+                label: s.name.replace(/ page$/i, "").slice(0, 10),
                 value: s.sessions,
               }))}
               color="var(--cool)"

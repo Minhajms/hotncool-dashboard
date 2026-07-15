@@ -55,9 +55,10 @@ export default async function MetaPage({
           sub="spend ÷ clicks"
         />
         <StatCard
-          label="Active campaigns"
+          label="Campaigns with spend"
           value={m.hasData ? num(m.campaigns.length) : "—"}
           accent="var(--android)"
+          sub="in this period"
         />
       </div>
 

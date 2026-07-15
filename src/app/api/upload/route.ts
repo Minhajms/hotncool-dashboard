@@ -12,17 +12,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "No file uploaded." }, { status: 400 });
   }
 
-  let rows;
+  let parsed;
   try {
-    rows = await parseUploadFile(file.name, await file.arrayBuffer());
+    parsed = await parseUploadFile(file.name, await file.arrayBuffer());
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: `Could not read file: ${(e as Error).message}` },
       { status: 400 },
     );
   }
+  const { rows, fields } = parsed;
 
-  if (rows.length === 0) {
+  if (rows.length === 0 || fields.length === 0) {
     return NextResponse.json(
       {
         ok: false,
@@ -33,7 +34,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const upserts = rows.map((r) => ({ ...r, source: "manual", updated_at: new Date().toISOString() }));
+  // Only write the columns the file actually contained — a file with just
+  // "date,orders" must never zero out installs fetched from the APIs.
+  const upserts = rows.map((r) => {
+    const rec: Record<string, unknown> = {
+      metric_date: r.metric_date,
+      source: "manual",
+      updated_at: new Date().toISOString(),
+    };
+    for (const f of fields) rec[f] = r[f] ?? 0;
+    return rec;
+  });
   const { error } = await supabaseAdmin
     .from("daily_metrics")
     .upsert(upserts, { onConflict: "metric_date" });
@@ -41,11 +52,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
+  const first = String(rows[0].metric_date);
+  const last = String(rows[rows.length - 1].metric_date);
   await supabaseAdmin.from("upload_log").insert({
     filename: file.name,
     rows: rows.length,
-    note: `Imported ${rows.length} day(s): ${rows[0].metric_date} → ${rows[rows.length - 1].metric_date}`,
+    note: `Imported ${rows.length} day(s) [${fields.join(", ")}]: ${first} → ${last}`,
   });
 
-  return NextResponse.json({ ok: true, imported: rows.length, first: rows[0].metric_date, last: rows[rows.length - 1].metric_date });
+  return NextResponse.json({ ok: true, imported: rows.length, columns: fields, first, last });
 }

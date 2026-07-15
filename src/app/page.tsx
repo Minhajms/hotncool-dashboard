@@ -4,6 +4,7 @@ import { getOverview, getSearchConsoleSummary, getClarityRange, getAppMeta } fro
 import { fetchSearchConsoleDetail } from "@/lib/searchConsole";
 import { overviewInsights } from "@/lib/insights";
 import { resolveRange, rangeLabel, rangeDays } from "@/lib/range";
+import { qatarToday } from "@/lib/dates";
 import { num, qar } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,10 @@ export default async function OverviewPage({
 
   return (
     <div className="space-y-8">
-      <SectionTitle title="Overview" subtitle={`${rangeLabel(from, to)} · ${days} day${days > 1 ? "s" : ""}`} />
+      <SectionTitle
+        title="Overview"
+        subtitle={`${rangeLabel(from, to)} · ${days} day${days > 1 ? "s" : ""}${to === qatarToday() ? " · today is still in progress (partial)" : ""}`}
+      />
       <Card className="p-5">
         <p className="text-sm leading-relaxed">{summary}</p>
       </Card>

@@ -58,9 +58,17 @@ function toNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function rowsToParsed(headerRow: string[], dataRows: unknown[][]): ParsedDay[] {
+export type ParsedUpload = {
+  rows: Partial<ParsedDay>[];
+  /** Which columns the file actually provided (besides the date). Only these
+   *  get written, so a partial file never zeroes out API-fetched values. */
+  fields: (keyof ParsedDay)[];
+};
+
+function rowsToParsed(headerRow: string[], dataRows: unknown[][]): ParsedUpload {
   const cols = headerRow.map(normHeader);
-  const out: ParsedDay[] = [];
+  const fields = [...new Set(cols.filter((c): c is keyof ParsedDay => !!c && c !== "metric_date"))];
+  const out: Partial<ParsedDay>[] = [];
   for (const r of dataRows) {
     const rec: Partial<ParsedDay> = {};
     cols.forEach((field, i) => {
@@ -72,42 +80,36 @@ function rowsToParsed(headerRow: string[], dataRows: unknown[][]): ParsedDay[] {
         rec[field] = toNum(r[i]);
       }
     });
-    if (rec.metric_date) {
-      out.push({
-        metric_date: rec.metric_date,
-        ios_installs: rec.ios_installs ?? 0,
-        android_installs: rec.android_installs ?? 0,
-        orders: rec.orders ?? 0,
-        spend_qar: rec.spend_qar ?? 0,
-      });
-    }
+    if (rec.metric_date) out.push(rec);
   }
-  return out;
+  return { rows: out, fields };
 }
 
-function parseCsv(text: string): ParsedDay[] {
+const EMPTY: ParsedUpload = { rows: [], fields: [] };
+
+function parseCsv(text: string): ParsedUpload {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length < 2) return [];
+  if (lines.length < 2) return EMPTY;
   const split = (l: string) => l.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
   const header = split(lines[0]);
   const data = lines.slice(1).map(split);
   return rowsToParsed(header, data);
 }
 
-async function parseXlsx(buf: ArrayBuffer): Promise<ParsedDay[]> {
+async function parseXlsx(buf: ArrayBuffer): Promise<ParsedUpload> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
   const ws = wb.worksheets[0];
-  if (!ws) return [];
+  if (!ws) return EMPTY;
   const rows: unknown[][] = [];
   ws.eachRow((row) => {
     const vals = (row.values as unknown[]).slice(1); // exceljs is 1-indexed
     rows.push(vals);
   });
-  if (rows.length < 2) return [];
+  if (rows.length < 2) return EMPTY;
   const header = rows[0].map((v) => String(v ?? ""));
   return rowsToParsed(header, rows.slice(1));
 }
@@ -115,7 +117,7 @@ async function parseXlsx(buf: ArrayBuffer): Promise<ParsedDay[]> {
 export async function parseUploadFile(
   filename: string,
   buf: ArrayBuffer,
-): Promise<ParsedDay[]> {
+): Promise<ParsedUpload> {
   if (/\.csv$/i.test(filename)) {
     return parseCsv(new TextDecoder().decode(buf));
   }

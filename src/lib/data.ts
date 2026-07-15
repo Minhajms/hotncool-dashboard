@@ -76,17 +76,28 @@ export async function getOrdersCount(): Promise<number> {
   return count ?? 0;
 }
 
-/** Most recent updated_at across the tables that feed the dashboard. */
+/** Most recent updated_at across ALL tables that feed the dashboard. */
 export async function getLastUpdated(): Promise<string | null> {
-  const tables = ["daily_metrics", "weekly_metrics"] as const;
+  const tables = [
+    "daily_metrics",
+    "weekly_metrics",
+    "search_console_daily",
+    "ga4_daily",
+    "meta_spend_daily",
+    "clarity_daily",
+  ] as const;
+  const results = await Promise.all(
+    tables.map((t) =>
+      supabaseAdmin
+        .from(t)
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ),
+  );
   let latest: string | null = null;
-  for (const t of tables) {
-    const { data } = await supabaseAdmin
-      .from(t)
-      .select("updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  for (const { data } of results) {
     const u = (data as { updated_at?: string } | null)?.updated_at ?? null;
     if (u && (!latest || u > latest)) latest = u;
   }
