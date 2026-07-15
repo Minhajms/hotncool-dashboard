@@ -205,6 +205,26 @@ timestamp in Qatar time.
 
 ---
 
+## 10b. Agency-POC layer (added later)
+
+- **Global date engine** (`src/lib/range.ts`): presets Yesterday / Last 7 / Last 30 / This month /
+  All time / custom, via URL params. Every data page respects it; it hides itself on pages where
+  dates have no meaning (ARR, Upload, Sources). Pages state exactly which days their numbers cover,
+  and ranges ending today are marked "today is partial".
+- **Insights engine** (`src/lib/insights.ts`): plain-English problems + recommendations, rendered
+  on Overview ("What this means") and App Insights (e.g. dead-taps severity naming the worst
+  screen; iOS/Android priority; branded vs non-brand search advice).
+- **/sources** — coverage map: per-source status (Live / Connecting / Not connected), what it
+  tracks, and "Data through <date>" freshness.
+- **/app-insights** — full Clarity mirror (sessions, engagement, dead/rage taps, screens chart,
+  countries, per-day trend), range-aware, honest about how many days of saved history exist.
+- **QA audit fixes worth knowing:** footer "Last updated" now checks ALL source tables (was only
+  2 → could show stale time); CSV/Excel upload only writes the columns present in the file (was
+  zeroing API-fetched installs when uploading partial files); "Active campaigns" → "Campaigns
+  with spend"; multi-day "People" shown as avg/day (summing daily uniques double-counts).
+- **Known gap:** Firebase (app DAU/WAU/MAU, retention, crash-free) not connected — needs the
+  app's Firebase/GA4 property ID + robot Viewer access. Website GA4 (402884012) is separate and live.
+
 ## 11. What's left
 
 1. **Play Console** — wait for Google to apply bucket access, then write the install‑CSV parser.
