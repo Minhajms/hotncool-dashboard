@@ -12,7 +12,7 @@ const PRESETS = [
 ];
 
 // Pages where a date range has no meaning (static/manual pages).
-const RANGE_FREE_PAGES = ["/arr", "/upload"];
+const RANGE_FREE_PAGES = ["/arr", "/upload", "/sources"];
 
 export function DateRangePicker() {
   const router = useRouter();
