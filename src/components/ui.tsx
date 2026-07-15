@@ -1,5 +1,26 @@
 import React from "react";
 import { signedPct } from "@/lib/format";
+import { type Insight, INSIGHT_STYLE } from "@/lib/insights";
+
+export function InsightList({ insights, title = "Insights & recommendations" }: { insights: Insight[]; title?: string }) {
+  if (insights.length === 0) return null;
+  return (
+    <Card className="p-5">
+      <p className="mb-3 text-sm font-semibold">💡 {title}</p>
+      <div className="space-y-2">
+        {insights.map((ins, i) => {
+          const st = INSIGHT_STYLE[ins.level];
+          return (
+            <div key={i} className="flex gap-3 rounded-xl px-4 py-3 text-sm" style={{ background: st.bg }}>
+              <span className="font-bold" style={{ color: st.fg }}>{st.icon}</span>
+              <span>{ins.text}</span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
 
 export function Card({
   children,

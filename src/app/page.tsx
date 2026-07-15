@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { StatCard, SectionTitle, InfoBanner, Card, LineChart } from "@/components/ui";
+import { StatCard, SectionTitle, InfoBanner, Card, LineChart, InsightList } from "@/components/ui";
 import { getOverview, getSearchConsoleSummary, getClarityRange, getAppMeta } from "@/lib/data";
 import { fetchSearchConsoleDetail } from "@/lib/searchConsole";
+import { overviewInsights } from "@/lib/insights";
 import { resolveRange, rangeLabel, rangeDays } from "@/lib/range";
 import { num, qar } from "@/lib/format";
 
@@ -37,12 +38,25 @@ export default async function OverviewPage({
       ? `In this period you ${bits.slice(0, -1).join(", ")}${bits.length > 1 ? " and " : ""}${bits[bits.length - 1]}.`
       : "No data yet for this period — pick a wider range or connect more sources.";
 
+  const insights = overviewInsights({
+    metaSpend: o.metaSpend,
+    metaClicks: o.metaClicks,
+    ga4Users: o.ga4Users,
+    scClicks: o.scClicks,
+    topQuery: scDetail.queries[0]?.name,
+    installs: o.installs,
+    hasApp: o.hasAppData,
+  });
+
   return (
     <div className="space-y-8">
       <SectionTitle title="Overview" subtitle={`${rangeLabel(from, to)} · ${days} day${days > 1 ? "s" : ""}`} />
       <Card className="p-5">
         <p className="text-sm leading-relaxed">{summary}</p>
       </Card>
+
+      <InsightList insights={insights} title="What this means" />
+
 
       {/* ============ THE APP ============ */}
       <section>

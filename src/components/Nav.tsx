@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/trends", label: "Trends" },
   { href: "/meta", label: "Meta Ads" },
   { href: "/arr", label: "ARR" },
+  { href: "/sources", label: "Sources" },
   { href: "/upload", label: "Upload" },
 ];
 

@@ -328,6 +328,7 @@ export type OverviewMetrics = {
   hasAppData: boolean;
   // ads
   metaSpend: number;
+  metaClicks: number;
   metaHasData: boolean;
   costPerInstall: number | null;
   // web
@@ -394,6 +395,7 @@ export async function getOverview(from: string, to: string): Promise<OverviewMet
     orders,
     hasAppData: daily.length > 0,
     metaSpend: meta.totalSpend,
+    metaClicks: meta.totalResults,
     metaHasData: meta.hasData,
     costPerInstall: installs > 0 ? meta.totalSpend / installs : null,
     ga4Users: ga4.totalUsers,

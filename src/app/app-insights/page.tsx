@@ -1,6 +1,7 @@
-import { SectionTitle, Card, InfoBanner, StatCard, LineChart, BarChart } from "@/components/ui";
+import { SectionTitle, Card, InfoBanner, StatCard, LineChart, BarChart, InsightList } from "@/components/ui";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveRange, rangeLabel } from "@/lib/range";
+import { clarityInsights } from "@/lib/insights";
 import { num } from "@/lib/format";
 import { formatQatar } from "@/lib/dates";
 
@@ -105,6 +106,11 @@ export default async function AppInsightsPage({
   const countries = mergeRaw(rows, "Country");
   const periodLabel = daysCount === 1 ? `on ${first}` : `${first} → ${last}`;
 
+  const insights = clarityInsights({
+    sessions, ios, android, deadTaps, rageTaps, activeSecs: activeTime,
+    screensPerSession: sps, topScreen: screens[0]?.name.replace(/ page$/i, ""), days: daysCount,
+  });
+
   return (
     <div className="space-y-8">
       <SectionTitle
@@ -118,6 +124,9 @@ export default async function AppInsightsPage({
         <b>2026-07-13</b> and grows daily. Numbers below are totals for these {daysCount} day
         {daysCount > 1 ? "s" : ""}.
       </InfoBanner>
+
+      <InsightList insights={insights} />
+
 
       {/* Headline */}
       <section>
